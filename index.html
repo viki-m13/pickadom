@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pickadom — Minimal Domain Finder</title>
+<style>
+  :root { --bg:#fff; --fg:#111; --muted:#7a7a7a; --line:#e6e6e6; --radius:14px; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; padding:32px 18px 60px; background:var(--bg); color:var(--fg);
+    font:16px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    display:grid; place-items:start center;
+  }
+  .shell{width:100%; max-width:900px}
+  header{display:grid; gap:10px; justify-items:center; margin-bottom:22px}
+  .brand{font-size:clamp(28px,6vw,40px); letter-spacing:.02em; text-transform:lowercase; font-weight:700}
+  .sub{color:var(--muted); font-size:14px; text-align:center}
+
+  .card{border:1px solid var(--line); border-radius:var(--radius); padding:18px; background:#fff}
+  .search{display:grid; gap:14px}
+  .row{display:grid; gap:12px}
+  @media(min-width:720px){ .row.split{grid-template-columns:1fr 260px; align-items:start} }
+
+  .input{display:grid; gap:8px}
+  .label{font-size:12px; color:var(--muted); letter-spacing:.02em}
+
+  /* Bigger, multiline idea box */
+  textarea#keyword{
+    width:100%; min-height:72px; max-height:160px; resize:vertical;
+    padding:14px; border-radius:12px; border:1px solid var(--line);
+    background:#fff; color:var(--fg); font-size:16px; line-height:1.45;
+  }
+  textarea#keyword::placeholder{color:#b5b5b5}
+
+  .presets{display:flex; gap:8px; flex-wrap:wrap}
+  .chip{
+    border:1px solid var(--line); border-radius:999px; padding:8px 12px; background:#fff;
+    cursor:pointer; font-size:13px; user-select:none;
+  }
+  .chip.dark{background:#111; color:#fff; border-color:#111}
+
+  .tld-wrap{display:grid; gap:10px}
+  .tld-toolbar{color:var(--muted); font-size:12px}
+
+  /* Wider TLD boxes so labels never cut off */
+  .tld-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); /* was ~86px */
+    gap:12px;                                                 /* more breathing room */
+  }
+  .tld{
+    border:1px solid var(--line); border-radius:16px; padding:14px 16px; background:#fff;
+    display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; white-space:nowrap;
+  }
+  .tld input{accent-color:#000; width:18px; height:18px}
+  .tld span{font-size:14px}
+
+  .cta{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .primary{
+    border:1px solid #000; background:#000; color:#fff; padding:12px 16px;
+    border-radius:12px; font-weight:600; min-width:190px; cursor:pointer;
+  }
+  .primary:disabled{background:#222; border-color:#222; color:#999; cursor:not-allowed}
+  .hint{color:var(--muted); font-size:12px}
+
+  #results{margin-top:18px; display:grid; gap:12px}
+  .state{text-align:center; color:var(--muted); padding:16px; border:1px dashed var(--line); border-radius:var(--radius)}
+
+  .list{border:1px solid var(--line); border-radius:var(--radius); overflow:clip}
+  .list header{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line)}
+  .list header h2{margin:0; font-size:14px; letter-spacing:.02em; text-transform:uppercase}
+  .list header .meta{color:var(--muted); font-size:12px}
+  .items{display:grid}
+  .item{display:grid; gap:8px; grid-template-columns:1fr auto; padding:12px 14px; border-top:1px solid var(--line)}
+  .item:first-child{border-top:none}
+  .domain{font-weight:600; letter-spacing:.01em}
+  .ok{color:#0a0; font-size:12px}
+  .actions{display:flex; gap:6px; align-items:center}
+  .btn{border:1px solid var(--line); background:#fff; color:var(--fg); padding:8px 10px; border-radius:10px; font-size:12px; cursor:pointer}
+  .btn.icon{width:36px; display:grid; place-items:center}
+
+  footer{margin-top:28px; color:var(--muted); font-size:12px; text-align:center}
+  a.link{color:inherit; text-decoration:underline; text-underline-offset:3px}
+</style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">pickadom</div>
+      <div class="sub">Describe your idea → pick TLDs → get short, available domains (we check live).</div>
+    </header>
+
+    <section class="card search" aria-label="Domain search">
+      <div class="row split">
+        <div class="input">
+          <div class="label">Your idea</div>
+          <textarea id="keyword" placeholder="e.g., AI coffee shop, sustainable fashion, crypto wallet…&#10;Tip: press ⌘/Ctrl+Enter to search."></textarea>
+          <div class="hint">Press <strong>⌘/Ctrl+Enter</strong> to search. Enter alone makes a new line.</div>
+        </div>
+
+        <div class="input">
+          <div class="label">Quick TLD presets</div>
+          <div class="presets" role="group" aria-label="TLD presets">
+            <button type="button" class="chip dark" data-preset="classic">classic</button>
+            <button type="button" class="chip" data-preset="tech">tech</button>
+            <button type="button" class="chip" data-preset="global">global</button>
+            <button type="button" class="chip" data-preset="creative">creative</button>
+            <button type="button" class="chip" data-preset="commerce">commerce</button>
+            <button type="button" class="chip" data-preset="all">select all</button>
+            <button type="button" class="chip" data-preset="none">clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tld-wrap">
+        <div class="label">Extensions</div>
+        <div class="tld-toolbar">Tip: prioritize <strong>.com</strong>, but explore others for short gems.</div>
+
+        <div id="tldGrid" class="tld-grid">
+          <!-- Classic -->
+          <label class="tld"><input type="checkbox" data-tld=".com" checked><span>.com</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".net"><span>.net</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".org"><span>.org</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".co"><span>.co</span></label>
+          <!-- Tech -->
+          <label class="tld"><input type="checkbox" data-tld=".io"><span>.io</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".ai"><span>.ai</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".app"><span>.app</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".dev"><span>.dev</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".tech"><span>.tech</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".cloud"><span>.cloud</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".systems"><span>.systems</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".solutions"><span>.solutions</span></label>
+          <!-- Creative -->
+          <label class="tld"><input type="checkbox" data-tld=".xyz"><span>.xyz</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".site"><span>.site</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".space"><span>.space</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".studio"><span>.studio</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".design"><span>.design</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".art"><span>.art</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".blog"><span>.blog</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".media"><span>.media</span></label>
+          <!-- Commerce -->
+          <label class="tld"><input type="checkbox" data-tld=".shop"><span>.shop</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".store"><span>.store</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".market"><span>.market</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".inc"><span>.inc</span></label>
+          <!-- Global -->
+          <label class="tld"><input type="checkbox" data-tld=".world"><span>.world</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".global"><span>.global</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".earth"><span>.earth</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".one"><span>.one</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".live"><span>.live</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".today"><span>.today</span></label>
+          <!-- Verticals -->
+          <label class="tld"><input type="checkbox" data-tld=".finance"><span>.finance</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".capital"><span>.capital</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".ventures"><span>.ventures</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".group"><span>.group</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".health"><span>.health</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".care"><span>.care</span></label>
+          <label class="tld"><input type="checkbox" data-tld=".law"><span>.law</span></label>
+        </div>
+      </div>
+
+      <div class="cta">
+        <button id="generateBtn" class="primary" onclick="generateDomains()">Find Available Domains</button>
+        <span class="hint">Returns only available names. Sorted by length, then .com preference.</span>
+      </div>
+    </section>
+
+    <div id="results" aria-live="polite"></div>
+
+    <footer>
+      Availability via Domainr. Name ideas via DeepSeek. Consider registrar pricing (e.g. <a class="link" href="https://www.namecheap.com" target="_blank" rel="noopener">Namecheap</a>).
+    </footer>
+  </div>
+
+<script>
+  const DEEPSEEK_API_KEY = "";
+  const RAPIDAPI_KEY     = "";
+
+  const el = (s,r=document)=>r.querySelector(s);
+  const els=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  const PRESETS = {
+    classic:[".com",".net",".org",".co"],
+    tech:[".com",".io",".ai",".app",".dev",".tech",".cloud",".systems",".solutions"],
+    global:[".com",".world",".global",".earth",".one",".today",".live",".co"],
+    creative:[".com",".xyz",".site",".space",".studio",".design",".art",".blog",".media"],
+    commerce:[".com",".shop",".store",".market",".inc",".co"],
+    all:"ALL", none:"NONE"
+  };
+
+  function applyPreset(name){
+    const boxes=els('#tldGrid input[type="checkbox"]');
+    if(name==="all"){ boxes.forEach(b=>b.checked=true); return; }
+    if(name==="none"){ boxes.forEach(b=>b.checked=false); return; }
+    const list=PRESETS[name]||[];
+    boxes.forEach(b=>b.checked=list.includes(b.dataset.tld));
+  }
+  els('.chip').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      els('.chip').forEach(b=>b.classList.remove('dark'));
+      btn.classList.add('dark');
+      applyPreset(btn.dataset.preset);
+    });
+  });
+
+  // Cmd/Ctrl+Enter to search; Enter alone = newline
+  el('#keyword').addEventListener('keydown', e=>{
+    if((e.metaKey || e.ctrlKey) && e.key === 'Enter'){ generateDomains(); }
+  });
+
+  async function generateDomains(){
+    const keyword = el('#keyword').value.trim();
+    if(!keyword){ alert('Please enter a description of your business or idea.'); return; }
+
+    const btn = el('#generateBtn');
+    btn.disabled=true; btn.textContent='Searching…';
+    const resultsDiv=el('#results');
+    resultsDiv.innerHTML=`<div class="state">Generating ideas & checking availability…</div>`;
+
+    try{
+      const tlds = els('#tldGrid input[type="checkbox"]').filter(b=>b.checked).map(b=>b.dataset.tld);
+      if(!tlds.length) throw new Error('Select at least one TLD.');
+      const tldList = tlds.join(', ');
+      const prompt = `Generate 20 creative, short domain name ideas (under 12 characters total where possible) for a ${keyword} business, prioritizing .com and using only these TLDs: ${tldList}. Output only the domain names, one per line, no other text.`;
+
+      const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${DEEPSEEK_API_KEY}`,'Content-Type':'application/json'},
+        body:JSON.stringify({model:'deepseek-chat',messages:[{role:'user',content:prompt}],max_tokens:400,temperature:0.7})
+      });
+      if(!deepseekResponse.ok) throw new Error(`DeepSeek API error: ${deepseekResponse.status}`);
+      const deepseekData = await deepseekResponse.json();
+      const generatedText = deepseekData.choices[0].message.content.trim();
+
+      let domains = generatedText
+        .split('\n')
+        .map(d=>d.replace(/^[\-\*\d\.\)\s]+/,'').trim())
+        .filter(d=>d && tlds.some(t=>d.toLowerCase().endsWith(t.toLowerCase())));
+      domains = [...new Set(domains)].slice(0,20);
+      if(!domains.length) throw new Error('No valid domain ideas generated. Try different TLDs or description.');
+
+      resultsDiv.innerHTML = `<div class="state">Checking availability for ${domains.length} ideas…</div>`;
+
+      const checkedDomains=[];
+      for(const domain of domains){
+        try{
+          const url = `https://domainr.p.rapidapi.com/v2/status?domain=${encodeURIComponent(domain)}`;
+          const statusResponse = await fetch(url,{
+            method:'GET',
+            headers:{'x-rapidapi-key':RAPIDAPI_KEY,'x-rapidapi-host':'domainr.p.rapidapi.com'}
+          });
+          if(!statusResponse.ok){ console.warn('Domainr error',domain,statusResponse.status); continue; }
+          const statusData = await statusResponse.json();
+          const item = statusData.status && statusData.status.length ? statusData.status[0] : {status:'unknown'};
+          const statusStr = item.status || 'unknown';
+          const isAvailable = statusStr.includes('undelegated') && statusStr.includes('inactive');
+          if(isAvailable){ checkedDomains.push({domain:item.domain || domain}); }
+        }catch(e){ console.warn('Check failed for',domain,e); }
+      }
+
+      const available = checkedDomains.sort((a,b)=>{
+        const la=a.domain.length, lb=b.domain.length;
+        if(la!==lb) return la-lb;
+        return (b.domain.endsWith('.com')?1:0) - (a.domain.endsWith('.com')?1:0);
+      });
+
+      if(!available.length){
+        resultsDiv.innerHTML = `
+          <div class="list">
+            <header><h2>Available domains</h2><div class="meta">0 found</div></header>
+            <div class="items"><div class="item"><div class="domain">No available domains found.</div><div class="actions"></div></div></div>
+          </div>`;
+        return;
+      }
+
+      const list=document.createElement('div');
+      list.className='list';
+      list.innerHTML=`<header><h2>Available domains</h2><div class="meta">${available.length} found</div></header><div class="items"></div>`;
+      const items=list.querySelector('.items');
+
+      available.forEach(({domain})=>{
+        const row=document.createElement('div');
+        row.className='item';
+        const namecheap = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`;
+        row.innerHTML=`
+          <div>
+            <div class="domain">${domain}</div>
+            <div class="ok">available</div>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="window.open('${namecheap}','_blank','noopener')">Namecheap</button>
+            <button class="btn icon" title="Copy" onclick="copyText('${domain}', this)">⧉</button>
+          </div>`;
+        items.appendChild(row);
+      });
+
+      resultsDiv.innerHTML=''; resultsDiv.appendChild(list);
+
+    }catch(err){
+      resultsDiv.innerHTML = `<div class="state">Error: ${escapeHtml(err.message)}</div>`;
+      console.error(err);
+    }finally{
+      btn.disabled=false; btn.textContent='Find Available Domains';
+    }
+  }
+
+  function copyText(text, btn){
+    navigator.clipboard.writeText(text).then(()=>{
+      const old=btn.textContent; btn.textContent='✓'; setTimeout(()=>btn.textContent=old,800);
+    });
+  }
+  function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+</script>
+</body>
+</html>
